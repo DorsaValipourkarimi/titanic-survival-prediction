@@ -33,23 +33,41 @@ print(df.groupby("Sex")["Survived"].mean())
 print(df.groupby("Pclass")["Survived"].mean()) 
 print(df.groupby("Embarked")["Survived"].mean())
 
-#Sex-based model:
+##Sex-based model:
 df["SPrediction"] = df["Sex"].apply(lambda x:1 if x == "female" else 0)
 
 #Accuracy:
 Saccuracy = (df["SPrediction"] == df["Survived"]).mean()
 print("Sex-Based Model Accuracy level:", Saccuracy)
 
-#Class-based model:
+##Class-based model:
 df["CPrediction"] = df["Pclass"].apply(lambda x:1 if x == 1 else 0)
 
 #Accuracy:
 Caccuracy = (df["CPrediction"] == df["Survived"]).mean()
 print("Class-Based Model Accuracy level:", Caccuracy)
 
-#Age-based model:
+##Age-based model:
 df["APrediction"] = df["Age"].apply(lambda x:1 if x < 16 else 0)
 
 #Accuracy:
 Aaccuracy = (df["APrediction"] == df["Survived"]).mean()
 print("Age-Based Model Accuracy level:", Aaccuracy)
+
+##Fare-based model:
+df["Fare"] = df["Fare"].fillna(df["Fare"].mean()) #handle missing values:
+fare_threshold = df["Fare"].mean()
+df["FPrediction"] = df["Fare"].apply(lambda x:1 if x >= fare_threshold else 0)
+
+#Accuracy:
+Faccuracy = (df["FPrediction"] == df["Survived"]).mean()
+print("Fare-Based Model Accuracy level:", Faccuracy)
+
+#Sex & Class Based model:
+df2 = df.copy()
+#Features
+df2["sex_female"] = (df2["Sex"] == "female").astype(int)  #1 if female, 0 if male
+df2["class_n"] = (4 - df2["Pclass"])/3.0  # 1st=1.0, 2nd=0.667, 3rd=0.333
+
+X = df2[["sex_female" ,"class_n"]].to_numpy()
+y = df2["Survived"].to_numpy()
