@@ -123,3 +123,32 @@ for w in ([5,1], [4,2], [3,2], [1,5], [2,1]):
     print(f"Sex+Fare weights {w} -> acc={acc:.4f}")
     
 #still heavily rely on sex, focusing on fare still degrade the model
+
+
+##########################################################################
+
+
+X = df2[["sex_female" ,"fare_n"]].to_numpy()
+y = df2["Survived"].to_numpy()
+
+w = np.array([1.0, 1.0])
+
+#Parameters
+learning_rate = 0.1
+i = 10 #number of passes over the data
+
+def predict(X, w, thr=0.5):
+    scores = (X * w).sum(axis=1) / (w.sum() + 1e-9)
+    return (scores >= thr).astype(int)
+
+for ep in range(1, i+1):
+    mistakes = 0
+    for xi, yi, in zip(X,y):
+        yhat = 1 if (xi @ w) / (w.sum()+1e-9) >= 0.5 else 0
+        if yhat != yi:
+            #increase the weight toward the right label
+            w += learning_rate * (yi - yhat) *xi
+            mistakes += 1
+    p = predict(X, w)
+    acc = (p == y).mean()
+    print(f"Epoch {ep}: mistakes={mistakes}, acc={acc:.4f}, weights={w}")
