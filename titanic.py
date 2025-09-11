@@ -1,6 +1,7 @@
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+import numpy as np
 
 file_path = "titanic/train.csv"
 
@@ -71,3 +72,10 @@ df2["class_n"] = (4 - df2["Pclass"])/3.0  # 1st=1.0, 2nd=0.667, 3rd=0.333
 
 X = df2[["sex_female" ,"class_n"]].to_numpy()
 y = df2["Survived"].to_numpy()
+
+def Predict(weights, X, threshold=0.5):
+    w = np.array(weights, dtype=float)
+    w = w / (w.sum() + 1e-9) #to normalize weights to add up to 1
+    survival_score = (X * w).sum(axis=1)
+    return (survival_score >= threshold).astype(int) #return whether they survive (1) or not (0)
+
