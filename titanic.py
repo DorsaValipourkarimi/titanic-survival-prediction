@@ -34,8 +34,22 @@ print(df.groupby("Pclass")["Survived"].mean())
 print(df.groupby("Embarked")["Survived"].mean())
 
 #Sex-based model:
-df["Prediction"] = df["Sex"].apply(lambda x:1 if x == "female" else 0)
+df["SPrediction"] = df["Sex"].apply(lambda x:1 if x == "female" else 0)
 
 #Accuracy:
-accuracy = (df["Prediction"] == df["Survived"]).mea()
-print("Sex-Based Model Accuracy level:", accuracy)
+Saccuracy = (df["SPrediction"] == df["Survived"]).mean()
+print("Sex-Based Model Accuracy level:", Saccuracy)
+
+#Class-based model:
+df["CPrediction"] = df["Pclass"].apply(lambda x:1 if x == 1 else 0)
+
+#Accuracy:
+Caccuracy = (df["CPrediction"] == df["Survived"]).mean()
+print("Class-Based Model Accuracy level:", Caccuracy)
+
+#Age-based model:
+df["APrediction"] = df["Age"].apply(lambda x:1 if x < 16 else 0)
+
+#Accuracy:
+Aaccuracy = (df["APrediction"] == df["Survived"]).mean()
+print("Age-Based Model Accuracy level:", Aaccuracy)
