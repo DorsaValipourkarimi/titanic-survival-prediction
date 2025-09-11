@@ -64,7 +64,8 @@ df["FPrediction"] = df["Fare"].apply(lambda x:1 if x >= fare_threshold else 0)
 Faccuracy = (df["FPrediction"] == df["Survived"]).mean()
 print("Fare-Based Model Accuracy level:", Faccuracy)
 
-#Sex & Class Based model:
+############################################
+# #Sex & Class Based model:
 df2 = df.copy()
 #Features
 df2["sex_female"] = (df2["Sex"] == "female").astype(int)  #1 if female, 0 if male
@@ -79,3 +80,36 @@ def Predict(weights, X, threshold=0.5):
     survival_score = (X * w).sum(axis=1)
     return (survival_score >= threshold).astype(int) #return whether they survive (1) or not (0)
 
+weights_ex = [3,3]
+predict_ex = Predict(weights_ex, X)
+accuracy_ex = (predict_ex == y).mean()
+print("Accuracy of this model with given weights", weights_ex, ":", accuracy_ex)
+
+'''
+#weights where class dominates
+for w in ([1,3], [1,4], [1,5]):
+    preds = Predict(w, X)  # uses your normalized scoring & 0.5 cutoff
+    acc = (preds == y).mean()
+    print(w, acc)
+'''
+#When Class is given  more weight than Sex, the model degrads!
+
+################################
+#Sex & Fare Based model:
+df2 = df.copy()
+#Features
+df2["sex_female"] = (df2["Sex"] == "female").astype(int)  #1 if female, 0 if male
+
+X = df2[["sex_female" ,"Fare"]].to_numpy()
+y = df2["Survived"].to_numpy()
+
+def Predict(weights, X, threshold=0.5):
+    w = np.array(weights, dtype=float)
+    w = w / (w.sum() + 1e-9) #to normalize weights to add up to 1
+    survival_score = (X * w).sum(axis=1)
+    return (survival_score >= threshold).astype(int) #return whether they survive (1) or not (0)
+
+for w in ([5,1], [4,2], [3,2], [3,1], [2,1]):
+    preds = Predict(w, X, threshold=0.5)
+    acc = (preds == y).mean()
+    print(f"Sex+Fare weights {w} -> acc={acc:.4f}")
