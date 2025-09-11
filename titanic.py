@@ -97,19 +97,29 @@ for w in ([1,3], [1,4], [1,5]):
 ################################
 #Sex & Fare Based model:
 df2 = df.copy()
+
 #Features
 df2["sex_female"] = (df2["Sex"] == "female").astype(int)  #1 if female, 0 if male
+df2["Fare"] = df2["Fare"].fillna(df2["Fare"].median()) #Handle scale and nulls
 
-X = df2[["sex_female" ,"Fare"]].to_numpy()
+#Outlier clipping
+fare_min = df2["Fare"].quantile(0.01)
+fare_max = df2["Fare"].quantile(0.99)
+fare_clip = df2["Fare"].clip(fare_min, fare_max)
+df2["fare_n"] = (fare_clip - fare_min) / (fare_max - fare_min +1e-9) #normalize min max to [0,1]
+
+
+X = df2[["sex_female" ,"fare_n"]].to_numpy()
 y = df2["Survived"].to_numpy()
 
 def Predict(weights, X, threshold=0.5):
     w = np.array(weights, dtype=float)
-    w = w / (w.sum() + 1e-9) #to normalize weights to add up to 1
     survival_score = (X * w).sum(axis=1)
     return (survival_score >= threshold).astype(int) #return whether they survive (1) or not (0)
 
-for w in ([5,1], [4,2], [3,2], [3,1], [2,1]):
+for w in ([5,1], [4,2], [3,2], [1,5], [2,1]):
     preds = Predict(w, X, threshold=0.5)
     acc = (preds == y).mean()
     print(f"Sex+Fare weights {w} -> acc={acc:.4f}")
+    
+#still heavily rely on sex, focusing on fare still degrade the model
