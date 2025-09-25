@@ -1,0 +1,323 @@
+import numpy as np
+import pandas as pd
+
+#1
+def accuracy(y_true, y_pred):
+    y_true = np.asarray(y_true).ravel()
+    y_pred = np.asarray(y_pred).ravel()
+    return np.mean(y_true == y_pred)
+
+RNG = np.random.default_rng(60)
+NOTES = []
+METRICS = {}
+
+# Perceptron
+class Perceptron:
+    def __init__(self, lr=0.1, epochs=1000, random_state=42):
+        self.lr = lr
+        self.epochs = epochs
+        self.random_state = random_state
+        self.w = None
+        self.b = 0.0
+        self.errors_per_epoch = []
+
+    def fit(self, X, y):
+        X = np.asarray(X, dtype=float)
+        y = np.asarray(y, dtype=float)
+        rng = np.random.default_rng(self.random_state)
+        self.w = rng.normal(0, 0.01, X.shape[1])
+        self.b = 0.0
+        self.errors_per_epoch = []
+        for _ in range(self.epochs):
+            errors = 0
+            for xi, yi in zip(X, y):
+                yhat = 1.0 if (np.dot(self.w, xi) + self.b) >= 0 else -1.0
+                update = self.lr * (yi - yhat)
+                if update != 0:
+                    self.w += update * xi
+                    self.b += update
+                    errors += 1
+            self.errors_per_epoch.append(errors)
+            if errors == 0:
+                break
+        return self
+
+    def predict(self, X):
+        X = np.asarray(X, dtype=float)
+        z = X @ self.w + self.b
+        return np.where(z >= 0, 1.0, -1.0)
+
+# linearly separable dataset
+def make_linearly_separable(n=33, seed=10):
+    rng = np.random.default_rng(seed)
+    n2 = n // 2
+    A = rng.normal([0, 0], [0.5, 0.5], size=(n2, 2))
+    B = rng.normal([2, 2], [0.5, 0.5], size=(n - n2, 2))
+    X = np.vstack([A, B])
+    y = np.hstack([-np.ones(n2), np.ones(n - n2)])
+    return X, y
+
+X1, y1 = make_linearly_separable(n=20, seed=10)
+
+
+# train on part 1 dataset
+p1 = Perceptron(lr=0.1, epochs=1000, random_state=10).fit(X1, y1)
+yhat1 = p1.predict(X1)
+acc1 = accuracy(y1, yhat1)
+epochs1 = len(p1.errors_per_epoch)
+final_errors1 = p1.errors_per_epoch[-1] if p1.errors_per_epoch else None
+print({
+    "acc1": float(acc1),
+    "epochs1": int(epochs1),
+    "final_errors1": int(final_errors1)
+})
+
+import matplotlib.pyplot as plt
+
+def plot_points(X, y, ax=None):
+    ax = ax or plt.gca()
+    ax.scatter(X[y==-1][:,0], X[y==-1][:,1], marker="o", label="-1")
+    ax.scatter(X[y==1][:,0], X[y==1][:,1], marker="x", label="+1")
+    ax.legend()
+
+def plot_decision_boundary_2d(model, X, y, ax=None, pad=0.5, steps=200):
+    ax = ax or plt.gca()
+    x_min, x_max = X[:,0].min()-pad, X[:,0].max()+pad
+    y_min, y_max = X[:,1].min()-pad, X[:,1].max()+pad
+    xx, yy = np.meshgrid(np.linspace(x_min, x_max, steps), np.linspace(y_min, y_max, steps))
+    grid = np.c_[xx.ravel(), yy.ravel()]
+    zz = model.predict(grid).reshape(xx.shape)
+    ax.contourf(xx, yy, zz, alpha=0.2, levels=[-1,0,1])
+    plot_points(X, y, ax=ax)
+
+
+
+import matplotlib.pyplot as plt
+
+plt.figure()
+plot_decision_boundary_2d(p1, X1, y1)
+plt.title("Task 1: Perceptron decision boundary (separable data)")
+plt.savefig("HW2_task1_boundary.png", dpi=150, bbox_inches="tight")
+plt.close()
+
+
+#2
+# non-linearly separable data (XOR-style)
+import numpy as np
+
+def make_non_separable_xor(n=24, seed=30):
+    rng = np.random.default_rng(seed)
+    X = rng.uniform(-1, 1, size=(n, 2))
+    y = np.where(np.sign(X[:,0]) * np.sign(X[:,1]) > 0, 1.0, -1.0)
+    return X, y
+
+X2, y2 = make_non_separable_xor(n=24, seed=30)
+
+# Train perceptron on Task 2 data and report metrics
+p2 = Perceptron(lr=0.1, epochs=1000, random_state=20).fit(X2, y2)
+yhat2 = p2.predict(X2)
+
+def accuracy(y_true, y_pred):
+    y_true = np.asarray(y_true).ravel()
+    y_pred = np.asarray(y_pred).ravel()
+    return np.mean(y_true == y_pred)
+
+acc2 = accuracy(y2, yhat2)
+epochs2 = len(p2.errors_per_epoch)
+final_errors2 = p2.errors_per_epoch[-1] if p2.errors_per_epoch else None
+converged2 = (final_errors2 == 0)
+
+print({
+    "acc2": float(acc2),
+    "epochs2": int(epochs2),
+    "final_errors2": int(final_errors2),
+    "converged2": bool(converged2)
+})
+
+
+
+# 3: split, loader, Adaline
+def split_idx(n, test_size=0.3, seed=77):
+    rng = np.random.default_rng(seed)
+    idx = np.arange(n)
+    rng.shuffle(idx)
+    cut = int(n * (1 - test_size))
+    return idx[:cut], idx[cut:]
+
+def load_titanic(path="titanic.csv", seed=77, test_size=0.3):
+    df = pd.read_csv(path)
+    y = df["Survived"].astype(int)
+    num = ["Age","SibSp","Parch","Fare"]
+    cat = ["Sex","Pclass","Embarked"]
+    for c in num:
+        df[c] = df[c].fillna(df[c].median())
+    for c in cat:
+        df[c] = df[c].astype("category")
+        df[c] = df[c].cat.add_categories("MISSING").fillna("MISSING")
+    X = pd.get_dummies(df[num+cat], drop_first=True)
+    tr, te = split_idx(len(X), test_size=test_size, seed=seed)
+    Xtr = X.iloc[tr].to_numpy(float)
+    Xte = X.iloc[te].to_numpy(float)
+    ytr = y.iloc[tr].to_numpy(int)
+    yte = y.iloc[te].to_numpy(int)
+    mu = Xtr.mean(0); sd = Xtr.std(0) + 1e-8
+    Xtr = (Xtr - mu)/sd
+    Xte = (Xte - mu)/sd
+    feats = X.columns.tolist()
+    return Xtr, ytr, Xte, yte, feats
+
+class Adaline:
+    def __init__(self, lr=0.01, epochs=1000, random_state=77):
+        self.lr = lr; self.epochs = epochs; self.random_state = random_state
+        self.w = None; self.b = 0.0; self.losses_ = []
+
+    def fit(self, X, y):
+        X = np.asarray(X, float)
+        y = np.asarray(y, float)
+        y = np.where(y==0, -1.0, 1.0)
+        rng = np.random.default_rng(self.random_state)
+        self.w = rng.normal(0, 0.01, X.shape[1]); self.b = 0.0; self.losses_ = []
+        for _ in range(self.epochs):
+            yhat = X @ self.w + self.b
+            err = y - yhat
+            self.w += self.lr * (X.T @ err) / len(X)
+            self.b += self.lr * err.mean()
+            self.losses_.append(np.mean(err**2)/2.0)
+        return self
+
+    def predict(self, X):
+        z = np.asarray(X, float) @ self.w + self.b
+        return np.where(z>=0, 1, -1)
+
+    def predict01(self, X):
+        return np.where(self.predict(X)==1, 1, 0)
+
+#  3
+# get titanic.csv (public)
+df_t = pd.read_csv("https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv")
+df_t.to_csv("titanic.csv", index=False)
+len(df_t), df_t.columns.tolist()[:10]  # quick sanity check
+
+
+def split_idx(n, test_size=0.3, seed=77):
+    rng = np.random.default_rng(seed)
+    idx = np.arange(n)
+    rng.shuffle(idx)
+    cut = int(n * (1 - test_size))
+    return idx[:cut], idx[cut:]
+
+def load_titanic(path="titanic.csv", seed=77, test_size=0.3):
+    df = pd.read_csv(path)
+    y = df["Survived"].astype(int)
+    num = ["Age","SibSp","Parch","Fare"]
+    cat = ["Sex","Pclass","Embarked"]
+    for c in num:
+        df[c] = df[c].fillna(df[c].median())
+    for c in cat:
+        df[c] = df[c].astype("category")
+        df[c] = df[c].cat.add_categories("MISSING").fillna("MISSING")
+    X = pd.get_dummies(df[num+cat], drop_first=True)
+    tr, te = split_idx(len(X), test_size=test_size, seed=seed)
+    Xtr = X.iloc[tr].to_numpy(float)
+    Xte = X.iloc[te].to_numpy(float)
+    ytr = y.iloc[tr].to_numpy(int)
+    yte = y.iloc[te].to_numpy(int)
+    mu = Xtr.mean(0); sd = Xtr.std(0) + 1e-8
+    Xtr = (Xtr - mu)/sd
+    Xte = (Xte - mu)/sd
+    feats = X.columns.tolist()
+    return Xtr, ytr, Xte, yte, feats
+
+class Adaline:
+    def __init__(self, lr=0.01, epochs=1000, random_state=77):
+        self.lr = lr; self.epochs = epochs; self.random_state = random_state
+        self.w = None; self.b = 0.0; self.losses_ = []
+
+    def fit(self, X, y):
+        X = np.asarray(X, float)
+        y = np.asarray(y, float)
+        y = np.where(y==0, -1.0, 1.0)
+        rng = np.random.default_rng(self.random_state)
+        self.w = rng.normal(0, 0.01, X.shape[1]); self.b = 0.0; self.losses_ = []
+        for _ in range(self.epochs):
+            yhat = X @ self.w + self.b
+            err = y - yhat
+            self.w += self.lr * (X.T @ err) / len(X)
+            self.b += self.lr * err.mean()
+            self.losses_.append(np.mean(err**2)/2.0)
+        return self
+
+    def predict(self, X):
+        z = np.asarray(X, float) @ self.w + self.b
+        return np.where(z>=0, 1, -1)
+
+    def predict01(self, X):
+        return np.where(self.predict(X)==1, 1, 0)
+
+Xtr, ytr, Xte, yte, feats = load_titanic("titanic.csv", seed=77, test_size=0.3)
+ada = Adaline(lr=0.01, epochs=1000, random_state=77).fit(Xtr, ytr)
+ytr_hat = ada.predict01(Xtr)
+yte_hat = ada.predict01(Xte)
+acc_tr = accuracy(ytr, ytr_hat)
+acc_te = accuracy(yte, yte_hat)
+print({"acc_tr": float(acc_tr), "acc_te": float(acc_te)})
+
+#4
+fi = pd.DataFrame({"feat": feats, "w": ada.w})
+fi["abs"] = fi["w"].abs()
+print(fi.sort_values("abs", ascending=False).head(10).to_string(index=False))
+
+
+# 5 
+# t1: Baseline {-1,+1}
+lab1 = 1.0 if np.sum(y1==1.0) >= np.sum(y1==-1.0) else -1.0
+maj1 = np.full(len(y1), lab1, float)
+rng = np.random.default_rng(1)
+rnd1 = rng.choice([-1.0, 1.0], size=len(y1))
+w1 = rng.normal(0, 1, X1.shape[1]); b1 = rng.normal()
+lin1 = np.where(X1 @ w1 + b1 >= 0, 1.0, -1.0)
+t1 = {
+    "perc": float(accuracy(y1, p1.predict(X1))),
+    "maj":  float(accuracy(y1, maj1)),
+    "rand": float(accuracy(y1, rnd1)),
+    "line": float(accuracy(y1, lin1)),
+}
+
+# t2: {-1,+1}
+lab2 = 1.0 if np.sum(y2==1.0) >= np.sum(y2==-1.0) else -1.0
+maj2 = np.full(len(y2), lab2, float)
+rng = np.random.default_rng(2)
+rnd2 = rng.choice([-1.0, 1.0], size=len(y2))
+w2 = rng.normal(0, 1, X2.shape[1]); b2 = rng.normal()
+lin2 = np.where(X2 @ w2 + b2 >= 0, 1.0, -1.0)
+t2 = {
+    "perc": float(accuracy(y2, p2.predict(X2))),
+    "maj":  float(accuracy(y2, maj2)),
+    "rand": float(accuracy(y2, rnd2)),
+    "line": float(accuracy(y2, lin2)),
+}
+
+# titanic: {0,1}
+lab_t = 1 if np.sum(ytr==1) >= np.sum(ytr==0) else 0
+maj_tr = np.full(len(ytr), lab_t, int)
+maj_te = np.full(len(yte), lab_t, int)
+rng = np.random.default_rng(3)
+rnd_tr = rng.integers(0, 2, len(ytr))
+rnd_te = rng.integers(0, 2, len(yte))
+w, b = rng.normal(0, 1, Xtr.shape[1]), rng.normal()
+lin_tr = (Xtr @ w + b >= 0).astype(int)
+lin_te = (Xte @ w + b >= 0).astype(int)
+tit_tr = {
+    "ada":  float(accuracy(ytr, ada.predict01(Xtr))),
+    "maj":  float(accuracy(ytr, maj_tr)),
+    "rand": float(accuracy(ytr, rnd_tr)),
+    "line": float(accuracy(ytr, lin_tr)),
+}
+tit_te = {
+    "ada":  float(accuracy(yte, ada.predict01(Xte))),
+    "maj":  float(accuracy(yte, maj_te)),
+    "rand": float(accuracy(yte, rnd_te)),
+    "line": float(accuracy(yte, lin_te)),
+}
+
+print({"t1": t1, "t2": t2, "tit_train": tit_tr, "tit_test": tit_te})
